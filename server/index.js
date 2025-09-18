@@ -7,6 +7,7 @@ import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { type } from "node:os";
 import { text } from "node:stream/consumers";
+import nodemailer from "nodemailer"; 
 
 const app = express();
 app.use(express.json());
@@ -40,38 +41,47 @@ app.post('/mcp', async (req, res) => {
             version: "1.0.0"
         });
 
-        /*we will create a simple tool here by targeting the server*/
+        /*we will create a simple tool here by targeting the server for sending the mail to a user */
 
         server.tool(
-            /*here we create two parameters of string type 1st tells about the parameter and the another string is its description, then we pass the schema for structure. */
-            "addTwoNumbers",
-            "Add two numbers",
-            /* for making the schema we will install zod dependency*/
-            {
-                a: z.number(),
-                b: z.number(),
+    "sendEmail",
+    "Send an email to a recipient",
+    z.object({
+        recipient: z.string().email(),   
+        subject: z.string(),             
+        body: z.string(),                
+    }),
+    async ({ recipient, subject, body }) => {
+        try {
+            const transporter = nodemailer.createTransport({
+                service: "gmail",
+                auth: {
+                    user: process.env.EMAIL_USER,       // from .env
+                    pass: process.env.EMAIL_PASSWORD,   // app password
+                },
+            });
 
-            },
-            
-           async (arg ) =>{
-            const { a, b } = args;
+            await transporter.sendMail({
+                from: process.env.EMAIL_USER,
+                to: recipient,
+                subject: subject,
+                text: body,
+            });
 
-            /*the return statement of these tools are bit different, we can not directly use a+b*/
+            return [
+                { type: "text", text: ` Email sent to ${recipient}` },
+            ];
+        } catch (err) {
+            return [
+                { type: "text", text: ` Failed to send email: ${err.message}` },
+            ];
+        }
+    }
+);
 
+ /*the return statement of these tools are bit different, we can not directly use a+b*/
 
-            return[
-                {
-                    type:"text",
-                    text: `The sum of ${a} and ${b} is ${a + b}`
-                }
-            ]
-
-            }
-        )
-
-
-
-        // TODO: Add your tools, resources, or prompts here if needed
+ // TODO: Add your tools, resources, or prompts here if needed
 
         await server.connect(transport);
     } else {
